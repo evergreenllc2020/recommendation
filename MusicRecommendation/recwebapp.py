@@ -28,23 +28,43 @@ def hello():
 
 
 print("building recommendation engine")
-print("reading data")
-books_df = pd.read_csv("./dataset/books.csv")
-ratings_df = pd.read_csv("./dataset/ratings.csv", encoding='UTF-8',  dtype={'user_id': int,'book_id':int, 'rating':int} )
-books_df_2 = books_df[['book_id', 'books_count', 'original_publication_year', 'average_rating','original_title','image_url','authors']]
-combined_books_df = pd.merge(ratings_df, books_df, on='book_id')
+print("reading songs data ")
+songs_metadata_file = 'https://static.turi.com/datasets/millionsong/song_data.csv'
+songs_df =  pd.read_csv(songs_metadata_file)
+print("done")
+
+
+
+print("reading user data about songs")
+triplets_file = 'https://static.turi.com/datasets/millionsong/10000.txt'
+songs_to_user_df = pd.read_table(triplets_file,header=None)
+songs_to_user_df.columns = ['user_id', 'song_id', 'listen_count']
+print("done")
+
+
+
+print("merging songs and user data")
+combined_songs_df = pd.merge(songs_to_user_df, songs_df, on='song_id')
+print("done")
+
 print("creating pivot table")
-ct_df = combined_books_df.pivot_table(values='rating', index='user_id', columns='original_title', fill_value=0)
+ct_df = combined_songs_df.pivot_table(values='listen_count', index='user_id', columns='title', fill_value=0)
+print("done")
+
+
+print("applying SVD")
 X = ct_df.values.T
-print("Creating SVD")
 SVD  = TruncatedSVD(n_components=20, random_state=17)
 result_matrix = SVD.fit_transform(X)
-print("building correlation")
+print("done")
+
+print("crerating pearson corff matrix")
 corr_mat = np.corrcoef(result_matrix)
-book_names = ct_df.columns
-book_list = list(book_names)
-isInitialized = True
-print(book_list.index("The Hunger Games"))
+corr_mat.shape
+print("done")
+
+song_names = ct_df.columns
+song_list = list(song_names)
 print("done building recommendation engine")
 print("ready for recommendation engine")
 #hunger_game_index = book_list.index('The Hunger Games')
@@ -52,14 +72,15 @@ print("ready for recommendation engine")
 #list(book_names[(corr_hunger_games<1.0) & (corr_hunger_games>0.8)])
 
 
-def getRecommendations(bookName):
-	book_name_index = book_list.index(bookName)
-	corr_book = corr_mat[book_name_index]
-	recList = list(book_names[(corr_book<1.0) & (corr_book>0.9)])
+def getRecommendations(songName):
+	query_index = song_list.index(songName)
+
+	corr_similar_songs = corr_mat[query_index]
+	recList = list(song_names[(corr_similar_songs<1.0) & (corr_similar_songs>0.98)])
 	max=5
 	if(len(recList)<5):
 		max=len(recList)
-	return books_df_2[books_df_2.original_title.isin(recList)]
+	return songs_df[songs_df.title.isin(recList)]
 
 
 
